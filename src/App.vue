@@ -1,9 +1,5 @@
 <template>
   <h1>Image Annotator</h1>
-  <div class="canvas">
-    <canvas ref="canvas" width="800" height="600"> </canvas>
-    <HelloWorld width="800" height="600" @change="handleCanvas" />
-  </div>
   <input type="file" accept="image/*" multiple @change="handleFile" />
 
   <button v-if="files.length" @click="handleClear">Clear all</button>
@@ -21,7 +17,23 @@
 
   <div v-if="selected !== null">
     <h3>Selected Image</h3>
-    <img :src="srcs[selected]" />
+    <div
+      class="canvas"
+      style="width: {{ dimensions.width }}px; height: {{ dimensions.height }}px;"
+    >
+      <canvas
+        ref="canvas"
+        :width="dimensions.width"
+        :height="dimensions.height"
+      >
+      </canvas>
+      <HelloWorld
+        :width="dimensions.width"
+        :height="dimensions.height"
+        @change="handleCanvas"
+      />
+      <img :src="srcs[selected]" />
+    </div>
     <p>{{ files[selected].name }}</p>
     <p>{{ files[selected].size }} bytes</p>
     <p>{{ files[selected].type }}</p>
@@ -38,6 +50,7 @@ const files = ref([]);
 const srcs = ref([]);
 const cache = ref({});
 const selected = ref(null);
+const dimensions = ref({ width: 0, height: 0 });
 
 async function handleFile(evt) {
   const newFiles = [];
@@ -59,6 +72,15 @@ async function handleFile(evt) {
 
 function handleSelect(i) {
   selected.value = i;
+
+  const image = new Image();
+  image.onload = () => {
+    dimensions.value = {
+      width: image.width,
+      height: image.height,
+    };
+  };
+  image.src = srcs.value[i];
 }
 
 function handleClear() {
@@ -129,6 +151,7 @@ function handleCanvas({ x, y, width, height }) {
 }
 
 .canvas {
+  position: relative;
   canvas {
     position: absolute;
   }
