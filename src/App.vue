@@ -2,48 +2,69 @@
   <h1>Image Annotator</h1>
   <input type="file" accept="image/*" multiple @change="handleFile" />
 
-  <button v-if="files.length" @click="handleClear">Clear all</button>
+  <div v-for="image in images" :key="image.id">{{ image.name }}</div>
 
-  <div
-    class="img-item"
-    v-for="(file, i) in files"
-    :key="file.name"
-    :class="{ selected: selected === i }"
-  >
-    <img :src="srcs[i]" />
-    <span @click="handleSelect(i)">{{ file.name }}</span>
-    <button @click="handleDelete(i)">Delete</button>
-  </div>
-
-  <div v-if="selected !== null">
-    <h3>Selected Image</h3>
-    <div
-      class="canvas"
-      style="width: {{ dimensions.width }}px; height: {{ dimensions.height }}px;"
-    >
-      <canvas
-        ref="canvas"
-        :width="dimensions.width"
-        :height="dimensions.height"
+  <main>
+    <div class="img-list">
+      <button v-if="files.length" @click="handleClear">Clear all</button>
+      <div
+        class="img-list-item"
+        v-for="(file, i) in files"
+        :key="file.name"
+        :class="{ selected: selected === i }"
       >
-      </canvas>
-      <HelloWorld
-        :width="dimensions.width"
-        :height="dimensions.height"
-        @change="handleCanvas"
-      />
-      <img :src="srcs[selected]" />
+        <img :src="srcs[i]" />
+        <span @click="handleSelect(i)">{{ file.name }}</span>
+        <button @click="handleDelete(i)">Delete</button>
+      </div>
     </div>
-    <p>{{ files[selected].name }}</p>
-    <p>{{ files[selected].size }} bytes</p>
-    <p>{{ files[selected].type }}</p>
-    <p>{{ files[selected].lastModifiedDate }}</p>
-  </div>
+
+    <div v-if="selected !== null">
+      <h3>Selected Image</h3>
+      <div
+        class="canvas"
+        style="width: {{ dimensions.width }}px; height: {{ dimensions.height }}px;"
+      >
+        <canvas
+          ref="canvas"
+          :width="dimensions.width"
+          :height="dimensions.height"
+        >
+        </canvas>
+        <HelloWorld
+          :width="dimensions.width"
+          :height="dimensions.height"
+          @change="handleCanvas"
+        />
+        <img :src="srcs[selected]" />
+      </div>
+      <p>{{ files[selected].name }}</p>
+      <p>{{ files[selected].size }} bytes</p>
+      <p>{{ files[selected].type }}</p>
+      <p>{{ files[selected].lastModifiedDate }}</p>
+    </div>
+  </main>
 </template>
 
 <script setup>
 import HelloWorld from "./components/HelloWorld.vue";
-import { ref, useTemplateRef } from "vue";
+import { ref, useTemplateRef, onMounted } from "vue";
+import Dexie from "dexie";
+
+const dbs = ref(null);
+
+onMounted(() => {
+  const db = new Dexie("mydb");
+  db.version(1).stores({
+    images: "++id, name, size, type, lastModifiedDate, blob, annotations",
+  });
+  dbs.value = db;
+
+  dbs.value.images.toArray().then((images) => {
+    images.value = images;
+    console.log(images);
+  });
+});
 
 const canvas = useTemplateRef("canvas");
 const files = ref([]);
@@ -51,6 +72,7 @@ const srcs = ref([]);
 const cache = ref({});
 const selected = ref(null);
 const dimensions = ref({ width: 0, height: 0 });
+const images = ref(null);
 
 async function handleFile(evt) {
   const newFiles = [];
@@ -64,6 +86,15 @@ async function handleFile(evt) {
   newFiles.sort((a, b) => a.name < b.name);
   for await (const file of newFiles) {
     const src = await loadImage(file);
+    const blob = await loadBlob(file);
+    await dbs.value.images.add({
+      name: file.name,
+      size: file.size,
+      type: file.type,
+      lastModifiedDate: file.lastModifiedDate,
+      blob: blob,
+      annotations: [],
+    });
     srcs.value.push(src);
   }
 
@@ -114,6 +145,19 @@ async function loadImage(file) {
   });
 }
 
+async function loadBlob(file) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const blob = new Blob([new Uint8Array(e.target.result)], {
+        type: file.type,
+      });
+      resolve(blob);
+    };
+    reader.readAsArrayBuffer(file);
+  });
+}
+
 function handleCanvas({ x, y, width, height }) {
   const ctx = canvas.value.getContext("2d");
   ctx.lineWidth = 2;
@@ -130,11 +174,17 @@ function handleCanvas({ x, y, width, height }) {
   color: #2c3e50;
 }
 
-.img-item {
+.img-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 320px;
+}
+.img-list-item {
   cursor: pointer;
   display: flex;
   align-items: center;
-  grid-gap: 10px;
+  gap: 10px;
   &:hover {
     background: #eee;
   }
@@ -155,5 +205,10 @@ function handleCanvas({ x, y, width, height }) {
   canvas {
     position: absolute;
   }
+}
+
+main {
+  display: flex;
+  gap: 10px;
 }
 </style>
