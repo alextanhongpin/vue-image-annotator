@@ -1,25 +1,29 @@
 <template>
-  <div class="hello">
-    <h1>{{ msg }}</h1>
-    <canvas
-      ref="canvas"
-      @mousemove="handleMousemove"
-      @mouseup="handleMouseup"
-      @mousedown="handleMousedown"
-    ></canvas>
-  </div>
+  <canvas
+    ref="canvas"
+    @mousemove="handleMousemove"
+    @mouseup="handleMouseup"
+    @mousedown="handleMousedown"
+    :width="width"
+    :height="height"
+  ></canvas>
 </template>
 
 <script setup>
-import { defineEmits, defineProps, ref, useTemplateRef } from "vue";
-const emit = defineEmits(["change"]);
+import { defineProps, defineEmits, ref, useTemplateRef } from "vue";
 
 defineProps({
-  msg: {
-    type: String,
-    default: "hi",
+  width: {
+    type: Number,
+    default: 800,
+  },
+  height: {
+    type: Number,
+    default: 600,
   },
 });
+
+const emit = defineEmits(["change"]);
 
 const canvas = useTemplateRef("canvas");
 const isDrawing = ref(false);

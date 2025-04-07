@@ -1,6 +1,9 @@
 <template>
   <h1>Image Annotator</h1>
-  <HelloWorld msg="Welcome" @change="handleCanvas" />
+  <div class="canvas">
+    <canvas ref="canvas" width="800" height="600"> </canvas>
+    <HelloWorld width="800" height="600" @change="handleCanvas" />
+  </div>
   <input type="file" accept="image/*" multiple @change="handleFile" />
 
   <button v-if="files.length" @click="handleClear">Clear all</button>
@@ -28,8 +31,9 @@
 
 <script setup>
 import HelloWorld from "./components/HelloWorld.vue";
-import { ref } from "vue";
+import { ref, useTemplateRef } from "vue";
 
+const canvas = useTemplateRef("canvas");
 const files = ref([]);
 const srcs = ref([]);
 const cache = ref({});
@@ -88,8 +92,11 @@ async function loadImage(file) {
   });
 }
 
-function handleCanvas(rect) {
-  console.log(rect);
+function handleCanvas({ x, y, width, height }) {
+  const ctx = canvas.value.getContext("2d");
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = "blue";
+  ctx.strokeRect(x, y, width, height);
 }
 </script>
 
@@ -118,6 +125,12 @@ function handleCanvas(rect) {
     max-width: 100px;
     max-height: 100px;
     border: 1px solid #ccc;
+  }
+}
+
+.canvas {
+  canvas {
+    position: absolute;
   }
 }
 </style>
