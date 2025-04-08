@@ -51,3 +51,9 @@ export async function deleteImage(...ids) {
 function isConstraintError(error) {
   return error.name === "ConstraintError";
 }
+
+export async function putImage(img) {
+  const clone = structuredClone(img);
+  delete clone.src;
+  await db.images.put(clone);
+}

@@ -3,22 +3,9 @@
   <input type="file" accept="image/*" multiple @change="handleFile" />
 
   <main>
-    <div class="img-list">
-      <button v-if="images.length" @click="handleClear">Clear all</button>
-      <div
-        class="img-list-item"
-        v-for="image in images"
-        :key="image.name"
-        :class="{ selected: selected === image.id }"
-        @click="handleSelect(image)"
-      >
-        <img :src="image.src" />
-        <span>{{ image.name }}</span>
-        <button @click="handleDelete(image)">Delete</button>
-      </div>
-    </div>
+    <FileList @select="handleSelect" />
 
-    <div v-if="selectedImage">
+    <div v-if="selected">
       <h3>Selected Image</h3>
       <div
         class="canvas"
@@ -30,49 +17,54 @@
           :height="dimensions.height"
         >
         </canvas>
-        <HelloWorld
+        <CanvasAnnotator
           :width="dimensions.width"
           :height="dimensions.height"
-          @change="handleCanvas"
+          @change="handleDraw"
         />
         <img
-          :src="selectedImage.src"
+          :src="selected.src"
           :width="dimensions.width"
           :height="dimensions.height"
         />
       </div>
       <p>{{ dimensions }}</p>
-      <p>{{ selectedImage.name }}</p>
-      <p>{{ selectedImage.size }} bytes</p>
-      <p>{{ selectedImage.type }}</p>
-      <p>{{ selectedImage.lastModifiedDate }}</p>
+      <p>{{ selected.name }}</p>
+      <p>{{ selected.src }}</p>
+      <p>{{ selected.size }} bytes</p>
+      <p>{{ selected.type }}</p>
+      <p>{{ selected.lastModifiedDate }}</p>
     </div>
   </main>
 </template>
 
 <script setup>
-import HelloWorld from "@/components/HelloWorld.vue";
-import { ref, computed, useTemplateRef, onMounted } from "vue";
-import { queryImages, deleteImage, addImage } from "@/repository/image";
+import CanvasAnnotator from "@/components/CanvasAnnotator.vue";
+import FileList from "@/components/FileList.vue";
+import { addImage, putImage } from "@/repository/image";
 import { resizeImage } from "@/models/image";
+import { ref, useTemplateRef } from "vue";
 
 const canvas = useTemplateRef("canvas");
 const selected = ref(null);
 const dimensions = ref({ width: 0, height: 0 });
-const images = ref([]);
 
-onMounted(async () => {
-  images.value = await queryImages();
-});
+function handleSelect(img) {
+  selected.value = img;
 
-const selectedImage = computed(() => {
-  const id = selected.value;
-  if (id == null) {
-    return null;
-  }
+  const image = new Image();
+  image.onload = () => {
+    const { width, height } = resizeImage(image);
+    dimensions.value.width = width;
+    dimensions.value.height = height;
+  };
+  image.src = img.src;
 
-  return images.value.find((image) => image.id === id);
-});
+  // Doesn't render immediately
+  setTimeout(() => {
+    img.annotations.forEach(drawRect);
+  }, 5);
+}
 
 async function handleFile(evt) {
   const files = Array.from(evt.target.files);
@@ -82,41 +74,19 @@ async function handleFile(evt) {
     await addImage(file);
   }
 
-  images.value = await queryImages();
+  // TODO: Fetch images
 }
 
-function handleSelect(image) {
-  selected.value = image.id;
+async function handleDraw(rect) {
+  const file = selected.value;
+  file.annotations = file.annotations || [];
+  file.annotations.push(rect);
+  await putImage(file);
 
-  const img = new Image();
-  img.onload = () => {
-    const { width, height } = resizeImage(img);
-    dimensions.value = {
-      width,
-      height,
-    };
-  };
-  img.src = image.src;
+  drawRect(rect);
 }
 
-function handleClear() {
-  selected.value = null;
-}
-
-async function handleDelete(image) {
-  // Clear selection.
-  if (selected.value === image.id) {
-    selected.value = null;
-  }
-
-  // Delete image.
-  await deleteImage(image.id);
-
-  // Refresh image list.
-  images.value = await queryImages();
-}
-
-function handleCanvas({ x, y, width, height }) {
+function drawRect({ x, y, width, height }) {
   const ctx = canvas.value.getContext("2d");
   ctx.lineWidth = 2;
   ctx.strokeStyle = "blue";
