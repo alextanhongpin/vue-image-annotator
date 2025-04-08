@@ -34,8 +34,10 @@
       <p>{{ selected.size }} bytes</p>
       <p>{{ selected.type }}</p>
       <p>{{ selected.lastModifiedDate }}</p>
-      <div v-for="an in selected.annotations" :key="an">
-        {{ an }} <button @click="handleDeleteAnnotation">Delete</button>
+      <div v-for="(an, i) in selected.annotations" :key="an">
+        <div @mousemove="handleHighlightAnnotation(i)">
+          {{ an }} <button @click="handleDeleteAnnotation">Delete</button>
+        </div>
       </div>
     </div>
   </main>
@@ -46,12 +48,21 @@ import CanvasAnnotator from "@/components/CanvasAnnotator.vue";
 import FileList from "@/components/FileList.vue";
 import { addImage, putImage } from "@/repository/image";
 import { resizeImage } from "@/models/image";
-import { ref, useTemplateRef } from "vue";
+import { ref, useTemplateRef, watch } from "vue";
 
 const fileList = useTemplateRef("files");
 const canvas = useTemplateRef("canvas");
 const selected = ref(null);
 const dimensions = ref({ width: 0, height: 0 });
+const selectedAnnotation = ref(null);
+
+watch(selectedAnnotation, (index) => {
+  const ctx = canvas.value.getContext("2d");
+  ctx.clearRect(0, 0, canvas.value.width, canvas.value.height);
+  selected.value.annotations.forEach((rect, i) => {
+    drawRect(rect, i === index ? "blue" : "red");
+  });
+});
 
 function handleSelect(img) {
   selected.value = img;
@@ -90,14 +101,18 @@ async function handleDraw(rect) {
   drawRect(rect);
 }
 
-function drawRect({ x, y, width, height }) {
+function drawRect({ x, y, width, height }, color = "blue") {
   const ctx = canvas.value.getContext("2d");
   ctx.lineWidth = 2;
-  ctx.strokeStyle = "blue";
+  ctx.strokeStyle = color;
   ctx.strokeRect(x, y, width, height);
 }
 
 function handleDeleteAnnotation() {}
+
+function handleHighlightAnnotation(i) {
+  selectedAnnotation.value = i;
+}
 </script>
 
 <style>
