@@ -3,7 +3,7 @@
   <input type="file" accept="image/*" multiple @change="handleFile" />
 
   <main>
-    <FileList @select="handleSelect" />
+    <FileList ref="files" @select="handleSelect" />
 
     <div v-if="selected">
       <h3>Selected Image</h3>
@@ -34,6 +34,9 @@
       <p>{{ selected.size }} bytes</p>
       <p>{{ selected.type }}</p>
       <p>{{ selected.lastModifiedDate }}</p>
+      <div v-for="an in selected.annotations" :key="an">
+        {{ an }} <button @click="handleDeleteAnnotation">Delete</button>
+      </div>
     </div>
   </main>
 </template>
@@ -45,6 +48,7 @@ import { addImage, putImage } from "@/repository/image";
 import { resizeImage } from "@/models/image";
 import { ref, useTemplateRef } from "vue";
 
+const fileList = useTemplateRef("files");
 const canvas = useTemplateRef("canvas");
 const selected = ref(null);
 const dimensions = ref({ width: 0, height: 0 });
@@ -74,7 +78,7 @@ async function handleFile(evt) {
     await addImage(file);
   }
 
-  // TODO: Fetch images
+  fileList.value.reload();
 }
 
 async function handleDraw(rect) {
@@ -92,6 +96,8 @@ function drawRect({ x, y, width, height }) {
   ctx.strokeStyle = "blue";
   ctx.strokeRect(x, y, width, height);
 }
+
+function handleDeleteAnnotation() {}
 </script>
 
 <style>
