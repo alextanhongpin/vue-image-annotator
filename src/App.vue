@@ -35,8 +35,13 @@
           :height="dimensions.height"
           @change="handleCanvas"
         />
-        <img :src="selectedImage.src" />
+        <img
+          :src="selectedImage.src"
+          :width="dimensions.width"
+          :height="dimensions.height"
+        />
       </div>
+      <p>{{ dimensions }}</p>
       <p>{{ selectedImage.name }}</p>
       <p>{{ selectedImage.size }} bytes</p>
       <p>{{ selectedImage.type }}</p>
@@ -49,6 +54,7 @@
 import HelloWorld from "@/components/HelloWorld.vue";
 import { ref, computed, useTemplateRef, onMounted } from "vue";
 import { queryImages, deleteImage, addImage } from "@/repository/image";
+import { resizeImage } from "@/models/image";
 
 const canvas = useTemplateRef("canvas");
 const selected = ref(null);
@@ -84,9 +90,10 @@ function handleSelect(image) {
 
   const img = new Image();
   img.onload = () => {
+    const { width, height } = resizeImage(img);
     dimensions.value = {
-      width: image.width,
-      height: image.height,
+      width,
+      height,
     };
   };
   img.src = image.src;
@@ -97,9 +104,16 @@ function handleClear() {
 }
 
 async function handleDelete(image) {
+  // Clear selection.
+  if (selected.value === image.id) {
+    selected.value = null;
+  }
+
+  // Delete image.
   await deleteImage(image.id);
 
-  this.images.value = await queryImages();
+  // Refresh image list.
+  images.value = await queryImages();
 }
 
 function handleCanvas({ x, y, width, height }) {

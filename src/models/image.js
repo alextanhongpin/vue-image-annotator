@@ -20,3 +20,23 @@ export async function loadBlob(file) {
     reader.readAsArrayBuffer(file);
   });
 }
+
+export function resizeImage({
+  width,
+  height,
+  maxWidth = 800,
+  maxHeight = 640,
+}) {
+  while (width > maxWidth || height > maxHeight) {
+    if (width > maxWidth) {
+      const scale = width / maxWidth;
+      width = maxWidth;
+      height /= scale;
+    } else if (height > maxHeight) {
+      const scale = height / maxHeight;
+      height = maxHeight;
+      width /= scale;
+    }
+  }
+  return { width, height };
+}

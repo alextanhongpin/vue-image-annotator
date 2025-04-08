@@ -7,6 +7,7 @@
     :width="width"
     :height="height"
   ></canvas>
+  <div>{{ start }}</div>
 </template>
 
 <script setup>
