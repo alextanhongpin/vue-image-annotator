@@ -2,24 +2,23 @@
   <h1>Image Annotator</h1>
   <input type="file" accept="image/*" multiple @change="handleFile" />
 
-  <div v-for="image in images" :key="image.id">{{ image.name }}</div>
-
   <main>
     <div class="img-list">
-      <button v-if="files.length" @click="handleClear">Clear all</button>
+      <button v-if="images.length" @click="handleClear">Clear all</button>
       <div
         class="img-list-item"
-        v-for="(file, i) in files"
-        :key="file.name"
-        :class="{ selected: selected === i }"
+        v-for="image in images"
+        :key="image.name"
+        :class="{ selected: selected === image.id }"
+        @click="handleSelect(image)"
       >
-        <img :src="srcs[i]" />
-        <span @click="handleSelect(i)">{{ file.name }}</span>
-        <button @click="handleDelete(i)">Delete</button>
+        <img :src="image.src" />
+        <span>{{ image.name }}</span>
+        <button @click="handleDelete(image)">Delete</button>
       </div>
     </div>
 
-    <div v-if="selected !== null">
+    <div v-if="selectedImage">
       <h3>Selected Image</h3>
       <div
         class="canvas"
@@ -36,126 +35,71 @@
           :height="dimensions.height"
           @change="handleCanvas"
         />
-        <img :src="srcs[selected]" />
+        <img :src="selectedImage.src" />
       </div>
-      <p>{{ files[selected].name }}</p>
-      <p>{{ files[selected].size }} bytes</p>
-      <p>{{ files[selected].type }}</p>
-      <p>{{ files[selected].lastModifiedDate }}</p>
+      <p>{{ selectedImage.name }}</p>
+      <p>{{ selectedImage.size }} bytes</p>
+      <p>{{ selectedImage.type }}</p>
+      <p>{{ selectedImage.lastModifiedDate }}</p>
     </div>
   </main>
 </template>
 
 <script setup>
-import HelloWorld from "./components/HelloWorld.vue";
-import { ref, useTemplateRef, onMounted } from "vue";
-import Dexie from "dexie";
-
-const dbs = ref(null);
-
-onMounted(() => {
-  const db = new Dexie("mydb");
-  db.version(1).stores({
-    images: "++id, name, size, type, lastModifiedDate, blob, annotations",
-  });
-  dbs.value = db;
-
-  dbs.value.images.toArray().then((images) => {
-    images.value = images;
-    console.log(images);
-  });
-});
+import HelloWorld from "@/components/HelloWorld.vue";
+import { ref, computed, useTemplateRef, onMounted } from "vue";
+import { queryImages, deleteImage, addImage } from "@/repository/image";
 
 const canvas = useTemplateRef("canvas");
-const files = ref([]);
-const srcs = ref([]);
-const cache = ref({});
 const selected = ref(null);
 const dimensions = ref({ width: 0, height: 0 });
-const images = ref(null);
+const images = ref([]);
+
+onMounted(async () => {
+  images.value = await queryImages();
+});
+
+const selectedImage = computed(() => {
+  const id = selected.value;
+  if (id == null) {
+    return null;
+  }
+
+  return images.value.find((image) => image.id === id);
+});
 
 async function handleFile(evt) {
-  const newFiles = [];
-  for (let file of evt.target.files) {
-    if (cache.value[file.name]) {
-      continue;
-    }
-    cache.value[file.name] = true;
-    newFiles.push(file);
-  }
-  newFiles.sort((a, b) => a.name < b.name);
-  for await (const file of newFiles) {
-    const src = await loadImage(file);
-    const blob = await loadBlob(file);
-    await dbs.value.images.add({
-      name: file.name,
-      size: file.size,
-      type: file.type,
-      lastModifiedDate: file.lastModifiedDate,
-      blob: blob,
-      annotations: [],
-    });
-    srcs.value.push(src);
+  const files = Array.from(evt.target.files);
+  files.sort((a, b) => a.name < b.name);
+  for await (const file of files) {
+    // Automatically skips duplicate files.
+    await addImage(file);
   }
 
-  files.value = files.value.concat(newFiles);
+  images.value = await queryImages();
 }
 
-function handleSelect(i) {
-  selected.value = i;
+function handleSelect(image) {
+  selected.value = image.id;
 
-  const image = new Image();
-  image.onload = () => {
+  const img = new Image();
+  img.onload = () => {
     dimensions.value = {
       width: image.width,
       height: image.height,
     };
   };
-  image.src = srcs.value[i];
+  img.src = image.src;
 }
 
 function handleClear() {
-  files.value = [];
-  srcs.value = [];
-  cache.value = {};
   selected.value = null;
 }
 
-function handleDelete(selectedIndex) {
-  const newFiles = [];
-  const newSrcs = [];
-  for (let i = 0; i < files.value.length; i++) {
-    if (i !== selectedIndex) {
-      newFiles.push(files.value[i]);
-      newSrcs.push(srcs.value[i]);
-    }
-  }
-  files.value = newFiles;
-  srcs.value = newSrcs;
-  selected.value = null;
-}
+async function handleDelete(image) {
+  await deleteImage(image.id);
 
-async function loadImage(file) {
-  const reader = new FileReader();
-  return new Promise((resolve) => {
-    reader.onload = () => {
-      resolve(reader.result);
-    };
-    reader.readAsDataURL(file);
-  });
-}
-
-async function loadBlob(file) {
-  return new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const blob = new Blob([new Uint8Array(e.target.result)], {
-        type: file.type,
-      });
-      resolve(blob);
-    };
-    reader.readAsArrayBuffer(file);
-  });
+  this.images.value = await queryImages();
 }
 
 function handleCanvas({ x, y, width, height }) {
